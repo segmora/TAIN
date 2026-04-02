@@ -54,7 +54,8 @@ Datasets are not included due to size. Download instructions:
 1. **Retail**: [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) -> extract to `retail/`
 2. **Sensor**: [Beijing Multi-Site Air Quality](https://archive.ics.uci.edu/dataset/501/) -> extract to `sensor/`
 3. **Finance**: Run the notebook cell that downloads via `yfinance`, or place `stocks_all.csv` in `finance/`
-4. **ICU (PhysioNet)**: [PhysioNet 2012 Challenge](https://physionet.org/content/challenge-2012/1.0.0/) -> extract `set-a/` and `Outcomes-a.txt` to `physionet/`
+4. **ICU-Temp**: [PhysioNet 2012 Challenge](https://physionet.org/content/challenge-2012/1.0.0/) -> extract `set-a/` and `Outcomes-a.txt` to `physionet/`
+5. **ICU-Urine**: Same PhysioNet 2012 source as above (different variable, same `physionet/` folder)
 
 ## Usage
 
