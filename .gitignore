@@ -1,0 +1,47 @@
+# Data files (too large for git, download instructions in README)
+retail/
+sensor/
+finance/
+physionet/
+energy/
+
+# Generated outputs
+*.png
+!paper-source/*.png
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Executed notebooks (large)
+*_executed.ipynb
+
+# Old/intermediate PDFs
+paper-source/Segmora_ArXiv_v4_Empirical_v2.pdf
+paper-source/segmora_arxiv_latex.pdf
+
+# DOCX (generated, not source)
+paper-source/*.docx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+paper-source/*.aux
+paper-source/*.log
+paper-source/*.bbl
+paper-source/*.blg
+paper-source/*.out
+paper-source/*.toc
+paper-source/*.synctex*
+
+# Section tex fragments
+section_*.tex
+
+# HVN/LGAL validation (separate paper, not included)
+hvn_lgal_validation.py
+fig_hvn_*.png
+fig_lgal_*.png
+fig_ou_verification.png
