@@ -106,7 +106,10 @@ our contribution is applying it to the \emph{normalization layer's running
 statistics}, a component that all prior irregular time series methods
 (GRU-D, Neural ODEs, mTAN) leave untouched. We show that $\alpha^{\Delta t}$
 is the natural discretization of the Ornstein-Uhlenbeck process, grounding
-TAIN in continuous-time stochastic process theory.
+TAIN in continuous-time stochastic process theory. We validate TAIN empirically
+as a running-statistics tracker across five real-world domains; end-to-end
+integration as a drop-in BatchNorm replacement in tabular neural network
+training is left to future work.
 
 To evaluate TAIN's impact on action stability, we analyze jitter using a
 decomposition into \emph{signal jitter} (desirable tracking of genuine
@@ -165,9 +168,9 @@ operational AI deployments.
 This paper addresses two gaps in the literature. First, while methods such as
 GRU-D \citep{che2018recurrent}, Neural ODEs \citep{chen2018neural}, and mTAN
 \citep{shukla2021multi} introduce time-awareness into hidden state dynamics or
-attention mechanisms, \emph{none modifies the normalization layer}. The running
-statistics that BatchNorm maintains via EMA are updated with a fixed $\alpha$
-regardless of observation spacing. Second, while policy churn
+attention mechanisms, \emph{none modifies the running-statistics update underlying
+the normalization layer}. The running statistics that BatchNorm maintains via
+EMA are updated with a fixed $\alpha$ regardless of observation spacing. Second, while policy churn
 \citep{schaul2022policy} and action oscillation \citep{chen2021action} have been
 identified as problems, no standard methodology decomposes jitter into its desirable
 (signal-tracking) and undesirable (noise-driven) components.
@@ -175,13 +178,15 @@ identified as problems, no standard methodology decomposes jitter into its desir
 \subsection{Contributions}
 
 \begin{itemize}[leftmargin=1.5em,itemsep=4pt]
-  \item \textbf{TAIN}: a normalization layer in which the inertia coefficient
+  \item \textbf{TAIN}: a time-aware running-statistics update rule for the
+    normalization layer, in which the inertia coefficient
     $\alpha^{\Delta t}$ adapts to the real elapsed time between observations,
     derived as the natural discretization of the Ornstein-Uhlenbeck process. The
     formula $\alpha^{\Delta t}$ is well known in time series analysis
     \citep{wright1986,zumbach2001operators}; our contribution is its application to
-    the normalization layer, a component untouched by prior irregular time
-    series methods.
+    the running-statistics update, a component untouched by prior irregular time
+    series methods. We validate TAIN as a tracker; end-to-end integration as a
+    drop-in BatchNorm replacement is left to future work.
 
   \item \textbf{Jitter decomposition analysis}: we evaluate TAIN using a
     decomposition of total estimate jitter into signal jitter (desirable) and
@@ -248,7 +253,7 @@ smoothing.
 The formula $\alpha^{\Delta t} = e^{-\lambda \Delta t}$ is thus well established.
 What has \emph{not} been proposed is applying this formula to the normalization
 layer's running statistics in a neural network. This is the specific gap that TAIN
-fills.
+addresses.
 
 \subsection{Time-Aware Batch Normalization}
 
@@ -304,8 +309,11 @@ time. TAIN replaces the fixed EMA coefficient $\alpha$ with $\alpha^{\Delta t}$:
 The formula $\alpha^{\Delta t}$ is equivalent to the exponential kernel
 $e^{-\lambda \Delta t}$ used by \citet{wright1986} and
 \citet{zumbach2001operators} for irregularly-sampled time series smoothing. Our
-contribution is not the formula itself but its application to the normalization
-layer, where prior work universally uses a fixed $\alpha$.
+contribution is not the formula itself but its application to the
+running-statistics update used in normalization layers, where prior work
+universally uses a fixed $\alpha$. We validate this application empirically as
+a tracker; end-to-end integration in neural network training is left to future
+work (Section~\ref{sec:futurework}).
 \end{remark}
 
 \subsubsection{Properties}
@@ -469,8 +477,16 @@ signal-tracking, not unnecessary oscillation.
 \subsubsection{Datasets}
 
 To complement the synthetic simulation in Section~5.1, we validate TAIN on five
-real-world datasets spanning distinct domains with naturally occurring irregular
-sampling. All code and data are publicly available for reproducibility.
+domain settings drawn from four publicly-available real-world data sources, all
+with naturally occurring irregular sampling. The five settings are Retail
+(Rossmann), Sensor (Beijing Multi-Site Air Quality), Finance (US Equities),
+and two channels from the PhysioNet 2012 ICU cohort: ICU-Temp and ICU-Urine.
+We treat ICU-Temp and ICU-Urine as separate settings because they capture
+distinct physiological processes (body temperature vs.\ urine output) on
+overlapping but non-identical patient subsets (1{,}787 vs.\ 3{,}555 patients);
+however, they share the same recording infrastructure and underlying cohort,
+so the two should not be regarded as fully independent corroborating
+domains. All code and data are publicly available for reproducibility.
 
 \begin{table}[h]
 \centering
@@ -495,14 +511,23 @@ creating gaps of 2--7+ days. We select the 50 stores with the most observations
 and filter to open days with positive sales, yielding irregular time series with
 a mean of 119 gaps per store.
 
-\textbf{Sensor.} The Beijing Multi-Site Air Quality dataset provides hourly PM2.5
-readings from 12 monitoring stations over 4 years (2013--2017). Sensor outages and
-maintenance windows produce gaps ranging from 2 hours to 350+ hours, with a total
-of 2{,}837 gaps across all stations.
+\textbf{Sensor.} The Beijing Multi-Site Air Quality dataset \citep{zhang2017cautionary}
+provides hourly PM2.5 readings from \emph{all 12} monitoring stations in the
+public release (Aotizhongxin, Changping, Dingling, Dongsi, Guanyuan, Gucheng,
+Huairou, Nongzhanguan, Shunyi, Tiantan, Wanliu, Wanshouxigong) over 4 years
+(March 2013--February 2017); no station subset was selected. Sensor outages
+and maintenance windows produce gaps ranging from 2 hours to 350+ hours, with
+a total of 2{,}837 gaps across all stations.
 
-\textbf{Finance.} Daily closing prices for AAPL, MSFT, GOOGL, AMZN, and TSLA
-from 2015--2025. Weekend closures produce 3-day gaps; market holidays produce
-4-day gaps. Each ticker contains approximately 544 gaps.
+\textbf{Finance.} Daily closing prices for five large-cap US technology
+equities (AAPL, MSFT, GOOGL, AMZN, TSLA) from January 2015 through
+December 2024, sourced from Yahoo Finance. These tickers were selected as a
+common benchmark subset (a 5-ticker slice of the so-called ``Magnificent 7'')
+prior to running TAIN; they were not screened for favorable behavior under the
+method. Weekend closures produce 3-day gaps; market holidays produce 4-day
+gaps. Each ticker contains approximately 544 gaps. We acknowledge that
+$N=5$ tickers is a small sample and report Finance results with this caveat
+in mind; expanding to a broader equity universe is a natural extension.
 
 \textbf{ICU-Temp.} The PhysioNet 2012 Challenge dataset \citep{physionet2012} contains ICU temperature readings from 4{,}000 patients. Measurements are taken at clinically-determined intervals, producing genuinely irregular sampling with 22.1\% of observations following gaps $> 1.5$ hours. We retain the 1{,}787 patients with $\geq 15$ temperature readings.
 
@@ -671,7 +696,15 @@ Overall & 5{,}409 & $+3.59$ & $[3.12, 4.07]$ & --- & 3{,}684/5{,}409 \\
 \end{table}
 
 The improvement is statistically significant ($p < 0.05$) in all five domains,
-with 3{,}684 of 5{,}409 entities (68\%) showing positive improvement.
+with 3{,}684 of 5{,}409 entities (68\%) showing positive improvement. The win
+rate is not uniform across domains: Retail (80\%), Sensor (100\%), and
+Finance (100\%) show high win rates, while ICU-Urine reaches 71.4\%
+($2{,}539/3{,}555$) and ICU-Temp only 60.9\% ($1{,}088/1{,}787$) --- barely
+above coin flip at the per-patient level despite a highly significant aggregate
+$p$-value. This thin ICU-Temp margin is consistent with the entity-level
+heterogeneity discussed in Section~\ref{sec:gap-correlation}: TAIN's benefit
+is concentrated on the acutely-unstable subset of patients rather than
+distributed uniformly across the cohort.
 
 \subsubsection{Stratified Post-Gap Recovery}
 \label{sec:stratified}
@@ -728,9 +761,13 @@ Domain & Gap Stratum & $n$ (gaps) & Post-Gap MAE Impr.\ (\%) \\
 \textbf{The Sensor domain provides the cleanest confirmation of the
 theoretical prediction.} Improvement increases monotonically across all five
 strata (7.6\% $\to$ 67.6\%), spanning more than $8\times$ in magnitude. The
-relationship is near-linear in the log gap, exactly the empirical signature
-of the Ornstein-Uhlenbeck discretization $\alpha^{\Delta t} = e^{-\lambda \Delta t}$
-established in Section~3.1.3.
+relationship is near-linear in the log gap, consistent with the
+Ornstein-Uhlenbeck discretization $\alpha^{\Delta t} = e^{-\lambda \Delta t}$
+established in Section~3.1.3 --- though we caution that this consistency does
+not by itself imply the underlying PM2.5 signal is an OU process; the
+discretization is the correct gap-aware update under OU dynamics, and the
+empirical fit indicates only that the gap-improvement relationship in Sensor
+is compatible with this prediction.
 
 \textbf{ICU-Temp shows a clean monotonic pattern in the well-sampled strata}
 (+23.0\% $\to$ +34.4\% $\to$ +34.0\% from 1.5--3h to 6--12h, with 13{,}967 of
@@ -757,6 +794,16 @@ only in the Sensor domain. Within-domain non-monotonicities --- the Retail 2--3
 day reversal, the Finance weekend dominance, and the ICU-Urine intermediate
 noise --- expose the limits of a single global $\alpha$ and motivate the
 learned $\alpha(t)$ direction discussed in Future Work.
+
+\textbf{Caveat on the Retail stratified support.} In Retail, the
+``largest-stratum-is-best'' pattern is carried entirely by the 7+ day stratum
+($n=5$ gaps, italicized in Table~\ref{tab:stratified}). The well-populated
+Retail strata are 1--2 days ($+2.8\%$, $n=3{,}575$) and 2--3 days ($-6.4\%$,
+$n=186$): the bulk of Retail evidence is a modest positive effect at short
+gaps with a small reversal at intermediate gaps. Retail therefore contributes
+to the four-of-five aggregate count only via the small-$n$ extreme stratum,
+and should not be read as independently confirming the gap-proportional
+prediction.
 
 \subsubsection{Entity-Level Gap-Magnitude Correlation}
 \label{sec:gap-correlation}
@@ -802,7 +849,23 @@ that TAIN's faster post-gap correction tracks well; patients sampled sparsely
 tend to be clinically stable, where standard EMA's inertia is already
 appropriate. The entity-level correlation is therefore confounded by patient
 acuity, and reflects a real heterogeneity rather than a failure of the OU
-discretization. We return to this in Limitations.
+discretization.
+
+\textbf{Auxiliary verification: the confound is direct.}
+To test this mechanism, we correlated per-patient mean Temp gap with the
+SAPS-I and SOFA acuity scores from PhysioNet 2012's outcomes file. Both
+correlations are strongly negative: $\rho = -0.281$ ($p < 10^{-32}$) for
+SAPS-I and $\rho = -0.375$ ($p < 10^{-58}$) for SOFA, across $N = 1{,}744$
+patients with valid scores. Sicker patients are sampled more densely by a
+margin twice as large as the $|\rho|=0.139$ gap-improvement correlation
+itself. In-hospital mortality shows only a weak association with mean gap
+($r = +0.113$, $p < 10^{-5}$, $N = 1{,}787$), consistent with mortality being
+a whole-stay outcome whereas sampling density reflects the recorded first
+48 hours. The strong SAPS-I and SOFA correlations confirm that the negative
+ICU-Temp Spearman reflects acutely-unstable patients (with rapidly varying
+temperatures and dense sampling) benefiting more from TAIN's post-gap
+correction, rather than a failure of the OU discretization. We return to
+this in Limitations.
 
 \subsubsection{Sensitivity to $\alpha$}
 
@@ -995,6 +1058,15 @@ recovery, and jitter decomposition) are validated on five public datasets
 (5{,}409 entities, 659{,}325 observations) with Wilcoxon significance tests and
 bootstrap confidence intervals.
 
+\textbf{Scope of empirical validation.} TAIN is evaluated as a
+\emph{running-statistics tracker}: the running mean and variance evolve under
+the TAIN update rule and we measure tracking RMSE, jitter, and post-gap recovery
+against the observed signal. We do \emph{not} integrate TAIN as a drop-in
+BatchNorm replacement in end-to-end tabular neural network training (TabNet,
+FT-Transformer, NODE) and we do not measure downstream task gains
+(classification AUC, regression $R^2$). Such integration is the natural next
+step and is discussed in Future Work (Section~\ref{sec:futurework}).
+
 The jitter decomposition (Section~5.2.9) reveals that the choice between TAIN and
 higher-accuracy methods (e.g., Kalman Filter) is not a question of which is
 ``better'' but which \emph{operating regime} the deployment requires:
@@ -1050,15 +1122,17 @@ the store manager who must act on it.
     stationary signal between gaps.
   \item \textbf{Entity-level heterogeneity in ICU-Temp.} The Spearman correlation
     between per-patient mean gap size and per-patient improvement is
-    significantly negative ($\rho = -0.139$, $p < 0.001$). This is consistent
-    with a patient-acuity confound (sicker patients are sampled more often
-    and benefit more from TAIN's fast post-gap correction) rather than a
-    failure of the OU discretization, but it indicates that TAIN's gains are
-    not uniformly distributed across the cohort. A patient-stratified
-    deployment would need to characterize who benefits before generalizing.
+    significantly negative ($\rho = -0.139$, $p < 0.001$). This is verified
+    to be a patient-acuity confound (mean gap correlates with SAPS-I at
+    $\rho = -0.281$ and SOFA at $\rho = -0.375$; Section~\ref{sec:gap-correlation})
+    rather than a failure of the OU discretization, but it indicates that
+    TAIN's gains are not uniformly distributed across the cohort. A
+    patient-stratified deployment would need to characterize who benefits
+    before generalizing.
 \end{itemize}
 
 \subsection{Future Work}
+\label{sec:futurework}
 
 \begin{itemize}[leftmargin=1.5em,itemsep=2pt]
   \item \textbf{End-to-end integration}: replace standard BatchNorm with TAIN
@@ -1082,12 +1156,13 @@ the store manager who must act on it.
 \section{Conclusion}
 
 We have introduced \textbf{Time-Aware Inertial Normalization (TAIN)}, a
-normalization layer that replaces the fixed EMA coefficient $\alpha$ with
-$\alpha^{\Delta t}$, adapting the running statistics' forgetting rate to the
-actual elapsed time between observations. While the formula $\alpha^{\Delta t}$
-is well established in time series analysis \citep{wright1986,zumbach2001operators},
-its application to the normalization layer of neural networks is, to our knowledge,
-novel. We ground TAIN in the Ornstein-Uhlenbeck process, providing a principled
+time-aware update rule for the running statistics maintained by normalization
+layers, in which the fixed EMA coefficient $\alpha$ is replaced with
+$\alpha^{\Delta t}$, adapting the forgetting rate to the actual elapsed time
+between observations. While the formula $\alpha^{\Delta t}$ is well established
+in time series analysis \citep{wright1986,zumbach2001operators}, its application
+to the running-statistics update underlying normalization layers is, to our
+knowledge, novel. We ground TAIN in the Ornstein-Uhlenbeck process, providing a principled
 theoretical foundation.
 
 To evaluate TAIN's impact on action stability, we employed a \textbf{jitter
@@ -1102,8 +1177,7 @@ observations) demonstrates that TAIN achieves statistically significant
 improvements over standard EMA ($p < 0.001$ in four of five domains). The
 largest gap stratum yields the largest improvement in four of five domains,
 with the Sensor domain exhibiting a clean monotonic increase from $+7.6\%$ to
-$+67.6\%$ that is a direct empirical signature of the Ornstein-Uhlenbeck
-discretization. The $L^1$ jitter decomposition reveals that TAIN's increase
+$+67.6\%$ consistent with the Ornstein-Uhlenbeck discretization. The $L^1$ jitter decomposition reveals that TAIN's increase
 in total jitter over Standard EMA is overwhelmingly signal-tracking rather than
 noise (98\%/2\% signal/unnecessary in Retail, $\geq 80\%$ signal across all
 five domains).
@@ -1117,8 +1191,9 @@ largest improvement in four of five domains; the Sensor domain shows a clean
 monotonic $+7.6\% \to +67.6\%$ progression directly confirming the OU
 discretization. Within-domain non-monotonicities at intermediate strata
 (Retail 2--3 day reversal, Finance weekend dominance, ICU-Urine middle-stratum
-noise) and entity-level heterogeneity (ICU-Temp $\rho = -0.139$, attributable
-to patient acuity confound) expose the limits of a single global $\alpha$.
+noise) and entity-level heterogeneity (ICU-Temp $\rho = -0.139$, verified to
+be a patient-acuity confound via SAPS-I/SOFA correlations; Section~\ref{sec:gap-correlation})
+expose the limits of a single global $\alpha$.
 \item \textbf{Efficient signal tracking:} the $L^1$ decomposition shows that
 $\geq 80\%$ of TAIN's total-jitter increment over Standard EMA is signal-tracking
 across all five domains (98\% in Retail). TAIN's unnecessary-share inflation
@@ -1137,9 +1212,11 @@ reality across irregular observation schedules.
 
 In retail operations, every unnecessary action change carries a real cost:
 cancelled purchase orders, shelf reorganization labor, staff redeployment
-friction. These costs are not captured by RMSE or log-likelihood. TAIN-based
-normalization minimizes \emph{Operational Churn Cost} (the aggregate cost of
-action oscillation), not prediction error alone.
+friction. These costs are not captured by RMSE or log-likelihood. By
+suppressing unnecessary jitter, TAIN-based normalization addresses an
+operational dimension of error --- action stability --- that prediction-loss
+metrics alone do not. Quantifying the dollar cost of this stability for a
+specific deployment remains future work.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section*{Acknowledgments}
@@ -1230,6 +1307,11 @@ Wright, D.~J. (1986).
 \newblock Forecasting data published at irregular time intervals using an
   extension of Holt's method.
 \newblock \emph{Management Science}, 32(4), 499--510.
+
+\bibitem[Zhang et al.(2017)]{zhang2017cautionary}
+Zhang, S., Guo, B., Dong, A., He, J., Xu, Z., \& Chen, S.~X. (2017).
+\newblock Cautionary tales on air-quality improvement in Beijing.
+\newblock \emph{Proceedings of the Royal Society A}, 473(2205), 20170457.
 
 \bibitem[Zumbach \& M\"uller(2001)]{zumbach2001operators}
 Zumbach, G., \& M\"uller, U. (2001).
