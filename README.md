@@ -12,11 +12,13 @@ The running-statistics update inside normalization layers (BatchNorm-style EMA) 
 
 ```
 # Standard EMA (time-blind)
-mu_t = (1 - alpha) * x_batch + alpha * mu_{t-1}
+mu_t = (1 - alpha) * x_t + alpha * mu_{t-1}
 
 # TAIN (time-aware)
-mu_t = (1 - alpha^dt) * x_batch + alpha^dt * mu_{t-1}
+mu_t = (1 - alpha^dt) * x_t + alpha^dt * mu_{t-1}
 ```
+
+(In the BatchNorm setting the per-step input is the batch mean `mu_batch`; for the single-stream tracker setting used in this paper it is simply `x_t`.)
 
 This is the natural discretization of the Ornstein-Uhlenbeck process. A 30-day gap resets statistics toward current conditions; a 1-hour gap preserves accumulated inertia.
 
